@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Birthday Check-up</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Outfit:wght@700&display=swap"
+        rel="stylesheet">
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Canvas Confetti (CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+    <!-- Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        mint: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                        },
+                        medical: {
+                            blue: '#eff6ff',
+                            slate: '#f8fafc',
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 20px 40px -15px rgba(20, 184, 166, 0.15)',
+                        'glow': '0 0 20px rgba(20, 184, 166, 0.4)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Custom CSS -->
+    <style>
+        body {
+            /* Prevent scrolling on mobile while brushing */
+            overscroll-behavior-y: contain;
+        }
+
+        .tooth-container {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            margin: 0 auto;
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .tooth-svg {
+            width: 100%;
+            height: 100%;
+            transition: all 1s ease-in-out;
+            filter: drop-shadow(0 15px 25px rgba(15, 118, 110, 0.1));
+        }
+
+        .tooth-path {
+            fill: #f1f5f9;
+            stroke: #cbd5e1;
+            stroke-width: 1.5;
+            transition: all 1s ease-in-out;
+        }
+
+        /* Clean State Animations */
+        .tooth-container.is-clean .tooth-svg {
+            filter: drop-shadow(0 0 30px rgba(20, 184, 166, 0.4)) drop-shadow(0 10px 20px rgba(20, 184, 166, 0.2));
+            transform: scale(1.05);
+        }
+
+        .tooth-container.is-clean .tooth-path {
+            fill: #ffffff;
+            stroke: #2dd4bf;
+        }
+
+        .tooth-photo {
+            opacity: 0;
+            transition: opacity 2.5s ease-in-out;
+            transition-delay: 0.5s;
+            /* Wait briefly after cleaning before fading in */
+            pointer-events: none;
+        }
+
+        .tooth-container.is-clean .tooth-photo {
+            opacity: 0.95;
+        }
+
+        .cavity {
+            fill: #334155;
+            transition: opacity 0.1s;
+        }
+
+        .cavity-overlay {
+            fill: rgba(51, 65, 85, 0.4);
+            filter: blur(2px);
+        }
+
+        .polishing-zone {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            cursor: pointer;
+            z-index: 10;
+            border-radius: 50%;
+            /* Used to capture events above svg */
+        }
+
+        .polishing-zone:active {
+            cursor: grabbing;
+        }
+
+        /* Sparkles */
+        .sparkle-icon {
+            position: absolute;
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            font-size: 1.5rem;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .tooth-container.is-clean .sparkle-icon {
+            animation: twinkle 2.5s infinite ease-in-out;
+        }
+
+        @keyframes twinkle {
+
+            0%,
+            100% {
+                opacity: 0;
+                transform: scale(0.5) rotate(0deg);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.2) rotate(45deg);
+                filter: drop-shadow(0 0 5px #fbbf24);
+            }
+        }
+
+        .s1 {
+            top: 5%;
+            left: 10%;
+            animation-delay: 0s !important;
+        }
+
+        .s2 {
+            top: 25%;
+            right: 5%;
+            animation-delay: 0.4s !important;
+            font-size: 2rem;
+        }
+
+        .s3 {
+            bottom: 20%;
+            left: 15%;
+            animation-delay: 0.8s !important;
+            font-size: 1.75rem;
+        }
+
+        /* Reveal Animation */
+        .reveal-enter {
+            animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes slideUpFade {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .smooth-height {
+            transition: max-height 0.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease-in-out;
+            max-height: 500px;
+            overflow: hidden;
+        }
+
+        .smooth-height.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin: 0;
+            padding: 0;
+        }
+
+        .hidden-initial {
+            display: none;
+        }
+
+        /* Tool animation during polishing */
+        .cursor-tool {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="%2314b8a6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>'), auto;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-gradient-to-br from-mint-50 to-blue-50/50 min-h-screen flex flex-col items-center justify-center p-4 antialiased text-slate-800">
+
+    <div class="bg-white rounded-3xl shadow-soft w-full max-w-md relative overflow-hidden border border-mint-100 p-8 sm:p-10 transition-all duration-500 hover:shadow-glow z-10"
+        id="main-card">
+
+        <!-- Header Decoration -->
+        <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-mint-300 via-mint-500 to-teal-400"></div>
+
+        <!-- Upper Info Section -->
+        <div id="checkup-section" class="smooth-height mb-6 lg:mb-8 text-center">
+            <div
+                class="inline-block bg-mint-50 text-mint-600 text-xs font-bold tracking-widest uppercase py-1 px-3 rounded-full mb-4 border border-mint-200">
+                Patient File
+            </div>
+
+            <div class="bg-slate-50 rounded-2xl p-5 border border-slate-100 text-left shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-slate-500">Patient Name:</span>
+                    <span class="font-bold text-slate-800 text-lg" id="patient-name">[Her Name]</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-slate-500">Status:</span>
+                    <span class="font-semibold text-amber-500 flex items-center gap-1" id="status-display">
+                        <span class="relative flex h-2.5 w-2.5 mr-1" id="status-dot">
+                            <span
+                                class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                        </span>
+                        Routine Check-up
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tooth Visualization -->
+        <div class="tooth-container group" id="tooth-container">
+            <svg viewBox="0 0 100 100" class="tooth-svg">
+                <defs>
+                    <clipPath id="tooth-clip">
+                        <path
+                            d="M 30,15 C 15,15 10,25 10,40 C 10,55 20,65 25,75 C 30,85 30,90 35,90 C 40,90 45,80 50,70 C 55,80 60,90 65,90 C 70,90 70,85 75,75 C 80,65 90,55 90,40 C 90,25 85,15 70,15 C 60,15 50,25 50,25 C 50,25 40,15 30,15 Z" />
+                    </clipPath>
+                </defs>
+                <!-- Main Tooth Shape -->
+                <path class="tooth-path" id="main-tooth"
+                    d="M 30,15 C 15,15 10,25 10,40 C 10,55 20,65 25,75 C 30,85 30,90 35,90 C 40,90 45,80 50,70 C 55,80 60,90 65,90 C 70,90 70,85 75,75 C 80,65 90,55 90,40 C 90,25 85,15 70,15 C 60,15 50,25 50,25 C 50,25 40,15 30,15 Z" />
+
+                <!-- The Hidden Photo -->
+                <image class="tooth-photo" id="patient-photo" href="" x="10" y="15" width="80" height="75"
+                    preserveAspectRatio="xMidYMid slice" clip-path="url(#tooth-clip)" />
+
+                <!-- The Cavity -->
+                <g id="cavity-group">
+                    <path class="cavity cavity-overlay"
+                        d="M 28,38 C 30,35 38,32 42,40 C 45,45 35,50 30,45 C 25,40 25,40 28,38 Z" />
+                    <path class="cavity" d="M 30,40 C 32,38 36,36 38,41 C 40,43 35,46 32,44 C 29,42 29,41 30,40 Z" />
+                    <circle class="cavity" cx="35" cy="40" r="3" />
+                </g>
+            </svg>
+
+            <!-- Interaction Overlay -->
+            <div id="polishing-zone" class="hidden-initial"></div>
+
+            <!-- Sparkle Elements -->
+            <div class="sparkle-icon s1">✨</div>
+            <div class="sparkle-icon s2">✨</div>
+            <div class="sparkle-icon s3">✨</div>
+        </div>
+
+        <!-- Action / Instruction Section -->
+        <div id="action-section" class="smooth-height mt-8 text-center px-2">
+            <button id="start-btn"
+                class="w-full bg-mint-500 hover:bg-mint-600 text-white font-bold py-4 px-8 rounded-2xl shadow-[0_8px_20px_-6px_rgba(20,184,166,0.5)] transition-all transform hover:-translate-y-1 active:translate-y-0 text-lg flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                    </path>
+                    <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                    <line x1="12" y1="22" x2="12" y2="12"></line>
+                </svg>
+                Start Polishing
+            </button>
+            <p id="instruction-text" class="hidden-initial text-mint-600 font-medium animate-pulse text-lg">
+                Drag and rub the tooth to clean it!
+            </p>
+        </div>
+
+        <!-- Reveal / Birthday Message Section -->
+        <div id="reveal-section" class="hidden-initial text-center mt-6">
+            <h1
+                class="font-display text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-mint-400 mb-4 tracking-tight drop-shadow-sm">
+                Perfect Health! <br> Happy Birthday <br> <span class="text-teal-600" id="reveal-name">[Her Name]</span>!
+                🎉
+            </h1>
+            <div class="w-16 h-1 bg-mint-200 mx-auto rounded-full mb-4"></div>
+            <p class="text-slate-600 leading-relaxed text-sm sm:text-base font-medium">
+                Happy Birthday badieeee!!🎉🎉🎉🎉🎉
+                wishing you all the best, our future dentist, we've made so much memory in little time it's like i know
+                you for so long
+                may this year be you year and hope everything works out for you.✨✨✨
+            </p>
+        </div>
+
+    </div>
+
+    <!-- Logic Script -->
+    <script>
+        /**
+         * =========================================
+         *  CONFIGURATION 
+         *  Change the name and photo URL below!
+         * =========================================
+         */
+        const CONFIG = {
+            patientName: "Nuni",
+            photoUrl: "photo.jpg" // Note: Replace this with a link to her photo!
+        };
+
+        // Populate Data
+        document.getElementById('patient-name').innerText = CONFIG.patientName;
+        document.getElementById('reveal-name').innerText = CONFIG.patientName;
+        document.getElementById('patient-photo').setAttribute('href', CONFIG.photoUrl);
+
+        // Elements
+        const startBtn = document.getElementById('start-btn');
+        const actionSection = document.getElementById('action-section');
+        const checkupSection = document.getElementById('checkup-section');
+        const instructionText = document.getElementById('instruction-text');
+        const polishingZone = document.getElementById('polishing-zone');
+        const cavityPaths = document.querySelectorAll('.cavity');
+        const toothContainer = document.getElementById('tooth-container');
+        const statusDisplay = document.getElementById('status-display');
+        const statusDot = document.getElementById('status-dot');
+        const revealSection = document.getElementById('reveal-section');
+
+        // State Machine
+        let isPolishing = false;
+        let dirtLevel = 100;
+
+        /**
+         * Button Click: Enter Polishing Phase
+         */
+        startBtn.addEventListener('click', () => {
+            isPolishing = true;
+
+            // Swap UI in action area
+            startBtn.classList.add('hidden-initial');
+            instructionText.classList.remove('hidden-initial');
+
+            // Activate overlay for grabbing events
+            polishingZone.classList.remove('hidden-initial');
+            polishingZone.classList.add('polishing-zone', 'cursor-tool');
+
+            // Update Status
+            statusDisplay.innerHTML = `
+                <span class="relative flex h-2.5 w-2.5 mr-1 pt-1">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
+                </span>
+                Polishing in Progress...
+            `;
+            statusDisplay.classList.replace('text-amber-500', 'text-blue-500');
+        });
+
+        /**
+         * Polishing Interaction
+         */
+        let lastInteraction = 0;
+        const handlePolishingAction = (e) => {
+            if (!isPolishing) return;
+
+            e.preventDefault(); // Prevent scroll while rubbing on mobile
+
+            // Throttle events slightly
+            const now = Date.now();
+            if (now - lastInteraction < 40) return;
+            lastInteraction = now;
+
+            // Reduce dirt level (faster on desktop, ensure mobile works too)
+            dirtLevel -= 4;
+
+            // Visual feedback - lower opacity of dark spots
+            const currentOpacity = Math.max(0, dirtLevel / 100);
+            cavityPaths.forEach(path => {
+                path.style.opacity = currentOpacity;
+            });
+
+            // Check if clean
+            if (dirtLevel <= 0) {
+                completeCheckup();
+            }
+        };
+
+        // Event Listeners for rubbing the tooth
+        polishingZone.addEventListener('mousemove', (e) => {
+            // Only trigger if mouse is pressed
+            if (e.buttons === 1) {
+                handlePolishingAction(e);
+            }
+        });
+        polishingZone.addEventListener('touchmove', handlePolishingAction, { passive: false });
+
+        // Also allow clicking to clean for users who prefer tapping
+        polishingZone.addEventListener('click', (e) => {
+            if (!isPolishing) return;
+            dirtLevel -= 15;
+            handlePolishingAction(e);
+        });
+
+        /**
+         * Finish Polishing & Reveal Surprise
+         */
+        function completeCheckup() {
+            isPolishing = false;
+            polishingZone.classList.add('hidden-initial');
+
+            // Update Tooth Styles immediately
+            toothContainer.classList.add('is-clean');
+
+            // Transition Layout
+            checkupSection.classList.add('collapsed');
+            actionSection.classList.add('collapsed');
+
+            setTimeout(() => {
+                checkupSection.classList.add('hidden-initial');
+                actionSection.classList.add('hidden-initial');
+
+                // Show Reveal Text
+                revealSection.classList.remove('hidden-initial');
+                revealSection.classList.add('reveal-enter');
+
+                // Fire Confetti!
+                fireConfetti();
+
+                // Keep firing for a massive explosion
+                setTimeout(fireConfetti, 500);
+                setTimeout(fireConfetti, 1200);
+            }, 800); // Wait for collapse animation slightly
+        }
+
+        /**
+         * Confetti Sequence using custom emojis (available in canvas-confetti > 1.6)
+         */
+        function fireConfetti() {
+            const hasCustomShapes = typeof confetti.shapeFromText === 'function';
+            let shapes = [];
+
+            if (hasCustomShapes) {
+                const toothbrush = confetti.shapeFromText({ text: '🪥', scalar: 3 });
+                const smile = confetti.shapeFromText({ text: '😁', scalar: 3 });
+                const toothIcon = confetti.shapeFromText({ text: '🦷', scalar: 3 });
+                const sparkle = confetti.shapeFromText({ text: '✨', scalar: 3 });
+                shapes = [toothbrush, smile, toothIcon, sparkle];
+            } else {
+                shapes = ['square', 'circle'];
+            }
+
+            const defaults = {
+                spread: 120,
+                startVelocity: 45,
+                particleCount: hasCustomShapes ? 40 : 80,
+                gravity: 0.8,
+                shapes: shapes,
+                colors: ['#2dd4bf', '#ffffff', '#0f766e', '#fef08a']
+            };
+
+            // Shoot from bottom left and bottom right
+            confetti({
+                ...defaults,
+                origin: { x: 0.1, y: 0.8 },
+                angle: 60
+            });
+            confetti({
+                ...defaults,
+                origin: { x: 0.9, y: 0.8 },
+                angle: 120
+            });
+
+            // Center explosion
+            confetti({
+                ...defaults,
+                origin: { x: 0.5, y: 0.7 },
+                angle: 90,
+                particleCount: hasCustomShapes ? 30 : 60,
+                spread: 160
+            });
+        }
+    </script>
+</body>
+
+</html>
